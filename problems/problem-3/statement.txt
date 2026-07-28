@@ -1,0 +1,7 @@
+PASTE_HERE -- replace this whole file with the problem statement.
+
+Keep the constraints section. It is the most important part of the file: the
+bounds (1 <= n <= 100000, 1 <= a_i <= 10^9, and so on) are what the generator is
+held to. Without them it produces illegal inputs and the results are worthless.
+
+Keep the input and output format description too.

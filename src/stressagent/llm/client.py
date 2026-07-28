@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import TypeVar
 
@@ -26,6 +27,23 @@ log = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 RETRYABLE_MARKERS = ("429", "500", "502", "503", "504", "deadline", "unavailable", "overloaded")
+
+# Gemini reports how long to wait on a 429: "Please retry in 46.9s". Free-tier
+# windows are around a minute, so exponential backoff from 1s exhausts every
+# attempt inside three seconds and reports the key as dead when it is merely
+# throttled. Honour the server's number instead of guessing.
+_RETRY_AFTER = re.compile(r"retry in ([0-9.]+)s", re.IGNORECASE)
+MAX_RETRY_SLEEP = 65.0
+
+
+def _retry_delay(error: str, attempt: int) -> float:
+    match = _RETRY_AFTER.search(error)
+    if match:
+        try:
+            return min(float(match.group(1)) + 1.0, MAX_RETRY_SLEEP)
+        except ValueError:
+            pass
+    return float(2**attempt)
 
 
 class ModelUnavailable(RuntimeError):
@@ -168,7 +186,9 @@ async def generate(
             last_error = exc
             text = str(exc).lower()
             if any(m in text for m in RETRYABLE_MARKERS) and attempt < attempts - 1:
-                await asyncio.sleep(2**attempt)
+                delay = _retry_delay(str(exc), attempt)
+                log.warning("model call throttled, sleeping %.1fs before retry", delay)
+                await asyncio.sleep(delay)
                 continue
             breaker().record_failure()
             await log_step(

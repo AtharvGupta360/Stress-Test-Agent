@@ -43,7 +43,12 @@ class LanguageSpec:
 LANGUAGES: dict[str, LanguageSpec] = {
     "cpp": LanguageSpec(
         filename="user.cpp",
-        compile_cmd=["g++", "-O2", "-std=c++17", "-o", "user", "user.cpp"],
+        # -DONLINE_JUDGE matches what Codeforces and most judges define. A great
+        # many submissions carry a local-debug block guarded by
+        # `#ifndef ONLINE_JUDGE` that freopens stdin from input.txt; without the
+        # macro that block fires here, the program reads a file that does not
+        # exist, and every round looks like a runtime error.
+        compile_cmd=["g++", "-O2", "-std=c++17", "-DONLINE_JUDGE", "-o", "user", "user.cpp"],
         run_cmd=["./user"],
     ),
     "python": LanguageSpec(filename="user.py", compile_cmd=None, run_cmd=["python3", "user.py"]),

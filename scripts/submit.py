@@ -48,6 +48,8 @@ def load_tests(directory: Path) -> list[dict]:
         if not outfile.exists():
             print(f"  warning: {infile.name} has no matching .out, skipping", file=sys.stderr)
             continue
+        if not infile.read_text(encoding="utf-8").strip():
+            continue  # unfilled scaffold slot
         tests.append(
             {
                 "input": infile.read_text(encoding="utf-8"),
@@ -84,6 +86,13 @@ def build_payload(args: argparse.Namespace) -> dict:
     statement = statement_path.read_text(encoding="utf-8")
 
     language, source = find_solution(root, args.code)
+
+    # Refuse scaffolding that was never filled in. Submitting placeholder text
+    # spends real tokens producing a confidently useless report.
+    for label, text in (("statement.txt", statement), ("the solution file", source)):
+        if "PASTE_HERE" in text:
+            raise SystemExit(f"{label} still contains the placeholder -- paste your content first")
+
     samples = load_tests(root / "samples")
     official = load_tests(root / "tests")
 

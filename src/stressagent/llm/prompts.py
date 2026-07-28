@@ -69,8 +69,10 @@ the seed alone. The shrinker depends on this.
 - SIZE is the size knob. The generated case must use exactly that value where \
 the problem allows it (n = SIZE), never more. SIZE=1 must produce the smallest \
 legal case, and it must not crash.
-- Prints ONE test case to stdout in the exact input format. If the problem is \
-multi-test, print a test count of 1 followed by a single case.
+- If the problem is multi-test, emit BETWEEN 2 AND 4 cases, not 1, keeping each \
+individual case at or below SIZE. Failing to reset state between test cases is \
+one of the most common bugs there is, and it is invisible to a generator that \
+only ever emits a single case. Use 1 case only when the format forbids more.
 - Every structural guarantee must hold: a tree must be connected and acyclic, a \
 permutation must contain each value once, a sorted array must be sorted.
 - Roughly a third of the time, bias toward extremes: all values equal, all \
