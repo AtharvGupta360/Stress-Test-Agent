@@ -112,6 +112,60 @@ python scripts/migrate.py
 docker compose up api worker
 ```
 
+### Submitting your own problem
+
+Lay the problem out as a directory:
+
+```
+problems/my-problem/
+    statement.txt        the problem text, constraints included
+    solution.cpp         your submission (.cpp / .py / .java)
+    samples/
+        1.in   1.out
+        2.in   2.out
+    tests/               optional: official/hidden tests, same naming
+        1.in   1.out
+```
+
+```bash
+python scripts/submit.py problems/my-problem
+```
+
+**If your code passes every test you have but an online judge rejected it** —
+the usual situation, since you have the samples and not the test that actually
+fails — say so:
+
+```bash
+python scripts/submit.py problems/my-problem --judge-says WA
+```
+
+Without that flag the local run returns `AC` and stops, because nothing it can
+see is wrong. The flag is what sends it looking.
+
+Useful extras: `--steps` prints the replay log, `--artifacts` dumps the brute
+force and generator the model wrote, `--code` picks a file when the directory
+holds more than one solution.
+
+A worked example ships in [problems/example-partition/](problems/example-partition/):
+a greedy that gets both samples right and is wrong in general.
+
+```
+$ python scripts/submit.py problems/example-partition --judge-says WA
+
+verdict    WA          tokens  9558 across 3 model calls
+rounds     5
+
+input:     5
+           630 629 628 627 626
+expected:  622
+actual:    626
+bug class: wrong_greedy
+```
+
+Submitting the correct solution in that same directory
+(`--code problems/example-partition/correct.cpp --judge-says WA`) reports no
+disagreement after 400 rounds rather than inventing a bug.
+
 ### Testing
 
 ```bash

@@ -45,21 +45,20 @@ async def _provision() -> str | None:
         return None
 
     try:
-        exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", test_name)
-        if not exists:
-            # CREATE DATABASE cannot run inside a transaction block.
-            await conn.execute(f'CREATE DATABASE "{test_name}"')
+        # Rebuild from scratch every session rather than migrating in place.
+        # An incremental path here drifts silently: the schema looks present, so
+        # newer migrations get skipped, and the suite fails against a stale
+        # database for reasons that have nothing to do with the code under test.
+        # CREATE/DROP DATABASE cannot run inside a transaction block.
+        await conn.execute(f'DROP DATABASE IF EXISTS "{test_name}" WITH (FORCE)')
+        await conn.execute(f'CREATE DATABASE "{test_name}"')
     finally:
         await conn.close()
 
     conn = await asyncpg.connect(test_url)
     try:
         for path in sorted(MIGRATIONS.glob("*.sql")):
-            already = await conn.fetchval("SELECT to_regclass('public.submissions')")
-            if already:
-                break
             await conn.execute(path.read_text(encoding="utf-8"))
-        await conn.execute("TRUNCATE submissions CASCADE")
     finally:
         await conn.close()
 

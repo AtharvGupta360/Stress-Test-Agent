@@ -116,14 +116,19 @@ async def _execute(row: dict, submission_id: str) -> None:
             return
 
         if mismatch is None:
+            source = (
+                "You reported this as rejected by an online judge"
+                if overridden
+                else "Wrong answer on the official tests"
+            )
             report = Report(
                 verdict=verdict.value,
                 rounds_run=ctx.rounds_run,
                 explanation=(
-                    f"Wrong answer on the official tests, but {ctx.rounds_run} randomized "
-                    "rounds against the reference implementation found no disagreement. "
-                    "The bug likely needs a larger or more adversarial input than the "
-                    "brute force can reach."
+                    f"{source}, but {ctx.rounds_run} randomized rounds against the "
+                    "reference implementation found no disagreement. The bug likely "
+                    "needs a larger or more adversarial input than the brute force "
+                    "can reach, or the submission may be correct."
                 ),
             )
             await finish(submission_id, State.DONE, verdict.value, report.model_dump(mode="json"))
