@@ -44,14 +44,20 @@ async def close_pool() -> None:
         _pool = None
 
 
-def idempotency_key(source_code: str, problem_id: str, language: str) -> str:
+def idempotency_key(
+    source_code: str, problem_id: str, language: str, external_verdict: str = ""
+) -> str:
     """Identical resubmissions cost nothing.
 
     pipeline_version is part of the hash so that shipping a prompt or gate fix
     invalidates stale results -- otherwise a bad cached report would be served
-    forever and the fix would be invisible.
+    forever and the fix would be invisible. external_verdict is in the hash too:
+    the same code submitted with and without "the judge says this is wrong" are
+    two different questions and deserve two different runs.
     """
-    blob = "\x00".join([source_code, problem_id, language, settings().pipeline_version])
+    blob = "\x00".join(
+        [source_code, problem_id, language, external_verdict, settings().pipeline_version]
+    )
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -66,21 +72,23 @@ async def create_submission(
     problem_id: str,
     samples: list[dict],
     official_tests: list[dict],
+    external_verdict: str = "",
 ) -> tuple[dict, bool]:
     """Returns (row, created). created=False means we served a cached result."""
-    key = idempotency_key(source_code, problem_id, language)
+    key = idempotency_key(source_code, problem_id, language, external_verdict)
     p = await pool()
     async with p.acquire() as conn:
         row = await conn.fetchrow(
             """
             INSERT INTO submissions
                 (idempotency_key, problem_id, statement, language, source_code,
-                 samples, official_tests)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 samples, official_tests, external_verdict)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (idempotency_key) DO NOTHING
             RETURNING *
             """,
             key, problem_id, statement, language, source_code, samples, official_tests,
+            external_verdict,
         )
         if row is not None:
             return dict(row), True

@@ -30,6 +30,11 @@ class SubmitRequest(BaseModel):
     samples: list[Sample] = Field(default_factory=list, max_length=20)
     official_tests: list[Sample] = Field(default_factory=list, max_length=200)
 
+    # "An online judge already told me this is wrong, but I don't have the
+    # failing test." Without this the samples pass, the verdict is AC, and the
+    # pipeline stops before it can look for the bug the user knows is there.
+    external_verdict: str = Field(default="", pattern="^(|WA|TLE|RE)$")
+
 
 class Counterexample(BaseModel):
     input: str

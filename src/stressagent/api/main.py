@@ -53,6 +53,7 @@ async def submit(req: SubmitRequest, response: Response) -> dict:
         problem_id=req.problem_id,
         samples=[s.model_dump() for s in req.samples],
         official_tests=[s.model_dump() for s in req.official_tests],
+        external_verdict=req.external_verdict,
     )
     if not created:
         # Idempotent replay: same code, same problem, same pipeline version.

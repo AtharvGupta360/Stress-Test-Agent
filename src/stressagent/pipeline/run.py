@@ -78,12 +78,27 @@ async def _execute(row: dict, submission_id: str) -> None:
         await set_state(submission_id, State.JUDGING)
         verdict, detail = await stages.compile_and_judge(ctx)
 
-        if verdict is not Verdict.WA:
-            # AC / CE / TLE / RE all terminate here. Only WA is worth the
+        external = (row.get("external_verdict") or "").strip()
+        # An external verdict rescues the common case: the user only has the
+        # samples, their code passes them, and an online judge already said the
+        # submission is wrong. Locally that reads as AC, so without this the run
+        # would stop before looking for the bug the user knows is there.
+        overridden = verdict is Verdict.AC and external in ("WA", "TLE", "RE")
+
+        if verdict is not Verdict.WA and not overridden:
+            # CE / TLE / RE all terminate here. Only a wrong answer is worth the
             # expense of authoring a reference implementation.
             report = Report(verdict=verdict.value, explanation=_terse(verdict, detail))
             await finish(submission_id, State.DONE, verdict.value, report.model_dump(mode="json"))
             return
+
+        if overridden:
+            await ctx.note(
+                "JUDGE", "gate", "ok",
+                why="local_tests_passed_external_verdict_overrides", external=external,
+            )
+            verdict = Verdict.WA
+            detail = {}
 
         try:
             mismatch = await _find_counterexample(ctx, detail)
