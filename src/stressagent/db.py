@@ -274,6 +274,16 @@ async def save_artifact(
         )
 
 
+async def get_artifact(submission_id: str, kind: str, revision: int = 0) -> str | None:
+    p = await pool()
+    async with p.acquire() as conn:
+        return await conn.fetchval(
+            "SELECT content FROM artifacts"
+            " WHERE submission_id = $1 AND kind = $2 AND revision = $3",
+            submission_id, kind, revision,
+        )
+
+
 async def get_artifacts(submission_id: str) -> list[dict]:
     p = await pool()
     async with p.acquire() as conn:

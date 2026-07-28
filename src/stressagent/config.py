@@ -13,7 +13,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://stress:stress@localhost:5433/stressagent"
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # gemini-2.5-flash is closed to new API keys (404 "no longer available to
+    # new users"), so it is a poor default. Pinned rather than using the
+    # `gemini-flash-latest` alias, which currently resolves here but can move
+    # under you between runs and make results irreproducible.
+    gemini_model: str = "gemini-3.6-flash"
 
     # Per-submission budgets. These are hard caps: the pipeline degrades rather
     # than exceeding them, so a pathological problem statement cannot run up an

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from ..config import settings
-from ..db import save_artifact
+from ..db import get_artifact, save_artifact
 from ..llm import prompts
 from ..llm.client import generate
 from ..models import AuthorOutput, CheckerOutput, ConstraintSpec, ExplainOutput
@@ -66,6 +66,17 @@ async def compile_and_judge(ctx: Context) -> tuple[Verdict, dict]:
 
 
 async def analyze(ctx: Context) -> ConstraintSpec:
+    # A retry after a rate-limit or crash reuses the same submission row, so a
+    # spec extracted on an earlier attempt is still valid. Recomputing it spends
+    # a model call to rediscover a fact we already wrote down -- which on a
+    # throttled key is the difference between finishing and not.
+    cached = await get_artifact(ctx.submission_id, "spec")
+    if cached:
+        spec = ConstraintSpec.model_validate_json(cached)
+        ctx.spec = spec
+        await ctx.note("ANALYZE", "gate", "skip", why="reused_cached_spec")
+        return spec
+
     spec = await generate(
         ctx.submission_id,
         stage="ANALYZE",
@@ -80,6 +91,7 @@ async def analyze(ctx: Context) -> ConstraintSpec:
     # reports a tiny cap only slows discovery. Clamp toward the safe side.
     spec.size_knob_brute_max = max(1, min(spec.size_knob_brute_max, 60))
     ctx.spec = spec
+    await save_artifact(ctx.submission_id, "spec", spec.model_dump_json(indent=2))
     await ctx.note(
         "ANALYZE", "gate", "ok",
         size_knob=spec.size_knob, brute_max=spec.size_knob_brute_max,
