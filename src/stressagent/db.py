@@ -174,8 +174,23 @@ async def finish(
         )
 
 
+async def get_usage(submission_id: str) -> dict:
+    """Read the budget counters without touching them.
+
+    Kept separate from add_usage so a pre-flight budget check cannot be mistaken
+    for a call actually happening -- conflating the two silently halves the
+    effective call budget.
+    """
+    p = await pool()
+    async with p.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT tokens_used, llm_calls FROM submissions WHERE id = $1", submission_id
+        )
+        return dict(row) if row else {"tokens_used": 0, "llm_calls": 0}
+
+
 async def add_usage(submission_id: str, tokens: int) -> dict:
-    """Increment budget counters and return the running totals."""
+    """Record exactly one completed model call. Returns the running totals."""
     p = await pool()
     async with p.acquire() as conn:
         row = await conn.fetchrow(

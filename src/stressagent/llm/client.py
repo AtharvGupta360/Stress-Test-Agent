@@ -19,7 +19,7 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from ..config import settings
-from ..db import add_usage, log_step
+from ..db import add_usage, get_usage, log_step
 
 log = logging.getLogger(__name__)
 
@@ -131,8 +131,8 @@ async def generate(
     if breaker().is_open:
         raise ModelUnavailable("circuit breaker open")
 
-    usage = await add_usage(submission_id, 0)  # read-modify: counts this call
-    if usage["llm_calls"] > s.max_llm_calls_per_submission:
+    usage = await get_usage(submission_id)
+    if usage["llm_calls"] >= s.max_llm_calls_per_submission:
         raise BudgetExhausted(f"llm call cap ({s.max_llm_calls_per_submission}) reached")
     if usage["tokens_used"] > s.max_tokens_per_submission:
         raise BudgetExhausted(f"token cap ({s.max_tokens_per_submission}) reached")

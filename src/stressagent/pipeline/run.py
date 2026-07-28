@@ -19,6 +19,10 @@ log = logging.getLogger(__name__)
 MAX_AUTHOR_REVISIONS = 3
 LEASE_SECONDS = 120
 
+# A failing official test is only worth returning as-is if a human can actually
+# read it. Above this, we go looking for a minimal one instead.
+MINIMAL_INPUT_CHARS = 400
+
 
 async def _heartbeat(submission_id: str, stop: asyncio.Event) -> None:
     """Keep the lease alive while a long stress run is in flight, so another
@@ -138,16 +142,40 @@ async def _execute(row: dict, submission_id: str) -> None:
 async def _find_counterexample(ctx: Context, judge_detail: dict) -> Mismatch | None:
     """Gate 0, then the authoring/validation/stress path."""
     free = judge_detail.get("free_counterexample")
+    fallback: Mismatch | None = None
     if free:
-        # The submitted code already fails a test we were handed. Authoring a
-        # brute force to rediscover that would be pure waste.
-        await ctx.note("STRESS", "gate", "skip", why="failing_official_test_reused")
-        return Mismatch(
+        fallback = Mismatch(
             seed=-1, size=-1, input=free["input"],
             expected=free["expected"], actual=free["actual"], reason="wrong answer",
         )
+        # Only short-circuit when the failing test is ALREADY small enough to
+        # read. Official tests routinely carry n=200000, and handing back a
+        # 200k-line input is not a counterexample anyone can act on --
+        # minimality is the entire product. A large failing test still proves
+        # the verdict, so we keep it as a fallback and go find a small one.
+        if len(free["input"]) <= MINIMAL_INPUT_CHARS:
+            await ctx.note("STRESS", "gate", "skip", why="failing_test_already_minimal")
+            return fallback
+        await ctx.note(
+            "STRESS", "gate", "ok",
+            why="failing_test_too_large_to_read", chars=len(free["input"]),
+        )
 
-    await set_state(ctx.submission_id, State.ANALYZING)
+    try:
+        minimal = await _author_and_stress(ctx)
+    except (ModelUnavailable, BudgetExhausted, MalformedResponse):
+        # A large but real counterexample beats degrading to nothing.
+        if fallback is not None:
+            await ctx.note("STRESS", "gate", "skip", why="model_failed_using_large_test")
+            return fallback
+        raise
+
+    # Every unminimised exit still returns the fallback when we have one: the
+    # user came for a counterexample, and a big one is worth more than none.
+    return minimal or fallback
+
+
+async def _author_and_stress(ctx: Context) -> Mismatch | None:
     spec = await stages.analyze(ctx)
 
     if not spec.output_unique:

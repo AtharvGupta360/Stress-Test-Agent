@@ -120,3 +120,22 @@ async def test_budget_counters_accumulate() -> None:
 
     assert usage["tokens_used"] == 2000
     assert usage["llm_calls"] == 2
+
+
+async def test_budget_check_does_not_count_as_a_call() -> None:
+    """The pre-flight check reads the counters; only a completed call writes.
+
+    Conflating the two makes every generate() increment llm_calls twice, which
+    silently halves the effective call budget.
+    """
+    payload = _payload("int main(){return 5;}")
+    row, _ = await db.create_submission(**payload)
+    submission_id = str(row["id"])
+
+    for _ in range(5):
+        await db.get_usage(submission_id)
+    await db.add_usage(submission_id, 100)
+    usage = await db.get_usage(submission_id)
+
+    assert usage["llm_calls"] == 1, "reading the budget must not consume it"
+    assert usage["tokens_used"] == 100
