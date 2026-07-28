@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stress
+      POSTGRES_PASSWORD: stress
+      POSTGRES_DB: stressagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stress -d stressagent"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "stressagent.api.main"]
+    environment:
+      DATABASE_URL: postgresql://stress:stress@db:5432/stressagent
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "stressagent.worker"]
+    environment:
+      DATABASE_URL: postgresql://stress:stress@db:5432/stressagent
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      SANDBOX_IMAGE: stressagent/sandbox:latest
+    volumes:
+      # The worker launches sibling containers on the host daemon rather than
+      # nesting Docker inside Docker.
+      #
+      # SECURITY: mounting the socket grants this container root-equivalent
+      # access to the host. Acceptable for local development. In production the
+      # runner belongs on its own VM, or behind gVisor / Firecracker, so that a
+      # sandbox escape does not become a host compromise.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
