@@ -103,11 +103,20 @@ src/stressagent/
 ## Running it
 
 ```bash
-cp .env.example .env      # set GEMINI_API_KEY
-docker build -t stressagent/sandbox:latest sandbox/
-docker compose up -d db
+cp .env.example .env                                  # set GEMINI_API_KEY
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+docker build -t stressagent/sandbox:latest sandbox/   # the judge image
+docker compose up -d db                               # host port 5433, see note below
 python scripts/migrate.py
 docker compose up api worker
+```
+
+Run the tests — the sandbox ones need Docker, the queue ones need the database,
+and neither needs an API key:
+
+```bash
+pytest tests -q      # 8 passed
 ```
 
 Submit:
@@ -142,3 +151,21 @@ Then `GET /submissions/{id}` for the report, `/stream` for live progress, and
 - **Isolation** — no network, read-only rootfs, tmpfs `/work`, `--cap-drop ALL`,
   `no-new-privileges`, CPU/memory/PID caps, plus per-process `RLIMIT_AS` inside
   the loop so one bad round can't OOM the container and lose the submission.
+
+## Gotchas worth knowing
+
+Four things that cost real debugging time here, recorded so they don't have to
+again:
+
+- **tmpfs comes up `root:root 0755`.** The sandbox runs unprivileged, so `/work`
+  has to be mounted `uid=1000,gid=1000` or nothing can write to it. The uid is
+  pinned in `sandbox/Dockerfile` to match.
+- **tmpfs is `noexec` by default.** Without `exec` in the mount options, a
+  freshly compiled binary fails with a bare "Permission denied" that looks
+  nothing like a mount problem.
+- **Postgres host port is 5433.** If a native Postgres already holds
+  `0.0.0.0:5432`, the container gets only the IPv6 bind, `localhost` resolves to
+  the *other* server, and you get an authentication error that looks like wrong
+  credentials.
+- **`--memory` without `--memory-swap`** lets a container swap past its limit,
+  which makes the memory cap decorative.

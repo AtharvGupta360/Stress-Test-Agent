@@ -16,6 +16,11 @@ from dataclasses import dataclass
 
 from ..config import settings
 
+# Must match the `judge` user pinned in sandbox/Dockerfile: the /work tmpfs is
+# created by the daemon, not the image, so it needs the numeric ids explicitly.
+JUDGE_UID = 1000
+JUDGE_GID = 1000
+
 _slots: asyncio.Semaphore | None = None
 
 
@@ -91,10 +96,13 @@ class Sandbox:
             "--memory-swap", s.sandbox_memory,
             "--pids-limit", str(s.sandbox_pids),
             "--read-only",
-            # `exec` is mandatory: docker mounts tmpfs noexec by default, and a
-            # compiled binary in /work would fail with a bare Permission denied.
-            "--tmpfs", "/work:rw,exec,size=128m",
-            "--tmpfs", "/tmp:rw,exec,size=64m",
+            # Two non-obvious flags here, both discovered the hard way:
+            #   exec  -- docker mounts tmpfs noexec by default, so a compiled
+            #            binary in /work dies with a bare "Permission denied".
+            #   uid/gid/mode -- a tmpfs comes up root:root 0755, which the
+            #            unprivileged `judge` user cannot write to at all.
+            "--tmpfs", f"/work:rw,exec,size=128m,uid={JUDGE_UID},gid={JUDGE_GID},mode=0700",
+            "--tmpfs", "/tmp:rw,exec,size=64m,mode=1777",
             "--security-opt", "no-new-privileges",
             "--cap-drop", "ALL",
             s.sandbox_image,

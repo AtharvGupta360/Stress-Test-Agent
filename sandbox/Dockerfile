@@ -11,7 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Unprivileged. Combined with --network none, --read-only and a tmpfs /work,
 # a hostile submission has nothing to reach for.
-RUN useradd --create-home --shell /usr/sbin/nologin judge \
+#
+# The uid is pinned rather than auto-assigned because the runner passes it to
+# `--tmpfs /work:...,uid=1000`; the tmpfs is created by the daemon and would
+# otherwise come up root-owned and unwritable. Keep the two in sync.
+RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin judge \
     && mkdir -p /work && chown judge:judge /work
 
 COPY driver.py /opt/driver.py

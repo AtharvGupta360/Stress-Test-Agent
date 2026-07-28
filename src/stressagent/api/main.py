@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Response
 from sse_starlette.sse import EventSourceResponse
@@ -114,7 +114,12 @@ async def artifacts(submission_id: str) -> dict:
     rows = await get_artifacts(submission_id)
     return {
         "artifacts": [
-            {"kind": r["kind"], "revision": r["revision"], "content": r["content"], "meta": r["meta"]}
+            {
+                "kind": r["kind"],
+                "revision": r["revision"],
+                "content": r["content"],
+                "meta": r["meta"],
+            }
             for r in rows
         ]
     }

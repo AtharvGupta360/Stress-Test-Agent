@@ -23,7 +23,8 @@ async def main() -> int:
             "CREATE TABLE IF NOT EXISTS schema_migrations ("
             " filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
         )
-        applied = {r["filename"] for r in await conn.fetch("SELECT filename FROM schema_migrations")}
+        rows = await conn.fetch("SELECT filename FROM schema_migrations")
+        applied = {r["filename"] for r in rows}
 
         for path in sorted(MIGRATIONS.glob("*.sql")):
             if path.name in applied:

@@ -216,7 +216,9 @@ async def validate(ctx: Context) -> str:
 
     # -- Gate 1: the brute force reproduces the official samples -------------
     for i, sample in enumerate(ctx.samples):
-        res = await ctx.sandbox.exec(["python3", "brute.py"], stdin_data=sample["input"], timeout=20)
+        res = await ctx.sandbox.exec(
+            ["python3", "brute.py"], stdin_data=sample["input"], timeout=20
+        )
         if res.timed_out or res.code != 0:
             await ctx.note("VALIDATE", "gate", "fail", which="brute", sample=i)
             return f"brute.py failed on sample {i + 1}:\n{res.stderr[:1500]}"

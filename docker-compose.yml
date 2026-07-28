@@ -6,7 +6,13 @@ services:
       POSTGRES_PASSWORD: stress
       POSTGRES_DB: stressagent
     ports:
-      - "5432:5432"
+      # 5433 on the host, not 5432: a native Postgres install is extremely
+      # common on dev machines, and when one is already bound to 0.0.0.0:5432
+      # this container silently ends up with only the IPv6 bind. Connections to
+      # `localhost` then land on the *other* server and fail authentication in
+      # a way that looks like a credentials bug. Services inside the compose
+      # network still talk to db:5432.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
