@@ -112,12 +112,18 @@ python scripts/migrate.py
 docker compose up api worker
 ```
 
-Run the tests — the sandbox ones need Docker, the queue ones need the database,
-and neither needs an API key:
+### Testing
 
 ```bash
-pytest tests -q      # 8 passed
+pytest tests -q                 # 9 passed; no API key needed
+python scripts/demo.py --steps  # full pipeline on a planted bug (uses the API)
+python scripts/demo.py --correct  # the AC path: 0 tokens, 0 model calls
 ```
+
+The sandbox tests need Docker, the queue tests need Postgres, and neither needs
+a model. `pytest` provisions its own `stressagent_test` database — sharing the
+dev one does not work, because a running worker claims the test rows within its
+poll interval and bills the model API for judging them.
 
 Submit:
 

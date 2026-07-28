@@ -32,6 +32,22 @@ async def _fresh_pool():
         await db.close_pool()
         pytest.skip("postgres not reachable")
     yield
+
+    # Park every row this test created in a terminal state before leaving.
+    # These tests write real rows into the real queue, so a worker running
+    # alongside them will happily claim the junk and drive it through the whole
+    # pipeline -- burning model tokens on submissions that were never meant to
+    # be judged.
+    pool = await db.pool()
+    await pool.execute(
+        """
+        UPDATE submissions
+           SET state = 'FAILED', finished_at = now(), lease_expires_at = NULL,
+               error = 'test fixture teardown'
+         WHERE problem_id LIKE 'test-%'
+           AND state NOT IN ('DONE', 'FAILED', 'DEGRADED')
+        """
+    )
     await db.close_pool()
 
 

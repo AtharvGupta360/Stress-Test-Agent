@@ -133,7 +133,9 @@ async def author(ctx: Context, failure: str = "") -> AuthorOutput:
         ("validator", out.validator_py),
     ):
         await save_artifact(ctx.submission_id, kind, content, revision=ctx.author_revision)
-    await ctx.note("AUTHOR", "llm_call", "ok", revision=ctx.author_revision, repair=bool(failure))
+    # kind="artifact", not "llm_call": the client already logged the call
+    # itself, and double-labelling makes the replay log read as two calls.
+    await ctx.note("AUTHOR", "artifact", "ok", revision=ctx.author_revision, repair=bool(failure))
     return out
 
 
@@ -152,7 +154,7 @@ async def author_checker(ctx: Context) -> str:
     )
     ctx.checker = out.checker_py
     await save_artifact(ctx.submission_id, "checker", out.checker_py)
-    await ctx.note("CHECKER", "llm_call", "ok")
+    await ctx.note("CHECKER", "artifact", "ok")
     return out.checker_py
 
 

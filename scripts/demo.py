@@ -99,7 +99,10 @@ def show(body: dict) -> None:
 
     ce = result.get("counterexample")
     if ce:
-        print(f"\nrounds     {result.get('rounds_run')} (shrink steps: {result.get('shrink_steps')})")
+        print(
+            f"\nrounds     {result.get('rounds_run')} "
+            f"(shrink steps: {result.get('shrink_steps')})"
+        )
         print("\n--- counterexample ---")
         print(f"input:     {ce['input'].strip()}")
         print(f"expected:  {ce['expected'].strip()}")

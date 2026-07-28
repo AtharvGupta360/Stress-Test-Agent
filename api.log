@@ -1,1 +1,13 @@
-INFO:     127.0.0.1:3020 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53734 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53744 - "POST /submissions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:53745 - "GET /submissions/5bf14242-8a6c-490f-833b-9a995d86307b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53746 - "GET /submissions/5bf14242-8a6c-490f-833b-9a995d86307b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14830 - "POST /submissions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:14831 - "POST /submissions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14832 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2562 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46243 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:27402 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:27434 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:29558 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38929 - "GET /stats HTTP/1.1" 200 OK
