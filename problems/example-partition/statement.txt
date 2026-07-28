@@ -1,0 +1,24 @@
+Balanced Partition
+
+You are given n integers. Split all of them into two groups, so that every
+integer belongs to exactly one group. A group may be empty.
+
+Find the minimum possible absolute difference between the sum of the first
+group and the sum of the second group.
+
+Input
+The first line contains a single integer n (1 <= n <= 18).
+The second line contains n integers a_1, a_2, ..., a_n (1 <= a_i <= 1000).
+
+Output
+Print one integer: the minimum possible absolute difference.
+
+Example
+Input
+4
+1 2 3 4
+Output
+0
+
+Explanation
+The groups {1, 4} and {2, 3} both sum to 5, so the difference is 0.
