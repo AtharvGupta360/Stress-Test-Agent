@@ -8,7 +8,11 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from ..config import settings
@@ -34,6 +38,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Stress-Test Agent", version="0.1.0", lifespan=lifespan)
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+async def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/healthz")
@@ -188,6 +199,10 @@ async def stats() -> dict:
         "llm_calls": totals["calls"],
         "states": [s.value for s in State],
     }
+
+
+# Mounted last so the API routes above always win the match.
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 def run() -> None:

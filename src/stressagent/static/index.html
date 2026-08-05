@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stress-Test Agent</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>Stress-Test Agent</h1>
+  </div>
+  <div class="topbar-meta">
+    <span id="model-badge" class="chip">connecting…</span>
+    <button type="button" id="theme-toggle" class="ghost" aria-label="Toggle colour theme">theme</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------------ submission -->
+  <section class="panel" aria-labelledby="submit-h">
+    <div class="panel-head">
+      <h2 id="submit-h">Submission</h2>
+      <button type="button" id="load-example" class="ghost">load example</button>
+    </div>
+
+    <form id="submit-form" class="form">
+
+      <div class="field">
+        <label for="statement">Problem statement</label>
+        <p class="hint">Include the constraints section — the bounds are what the generator is held to.</p>
+        <textarea id="statement" rows="9" spellcheck="false" required
+                  placeholder="Given n integers, print their sum.&#10;&#10;Input&#10;The first line contains n (1 &lt;= n &lt;= 100000).&#10;The second line contains n integers a_i (1 &lt;= a_i &lt;= 10^9)."></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="language">Language</label>
+          <select id="language">
+            <option value="cpp">C++</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="judge-says">External verdict</label>
+          <select id="judge-says">
+            <option value="">none — trust local tests</option>
+            <option value="WA">judge says Wrong Answer</option>
+            <option value="TLE">judge says Time Limit</option>
+            <option value="RE">judge says Runtime Error</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint tight">
+        Set an external verdict when your code passes every test you have but an online
+        judge rejected it. Otherwise the run stops at <span class="v v-ok">AC</span>.
+      </p>
+
+      <div class="field">
+        <label for="source">Your solution</label>
+        <textarea id="source" rows="14" spellcheck="false" class="code" required
+                  placeholder="#include &lt;iostream&gt;&#10;int main() { … }"></textarea>
+      </div>
+
+      <div class="field">
+        <div class="label-row">
+          <label>Samples</label>
+          <button type="button" id="add-sample" class="ghost">add pair</button>
+        </div>
+        <p class="hint">More samples means a better-verified reference implementation.</p>
+        <div id="samples"></div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="run" class="primary">Run</button>
+        <span id="form-error" class="error" role="alert"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- ---------------------------------------------------------- results -->
+  <section class="panel" aria-labelledby="result-h" aria-live="polite">
+    <div class="panel-head">
+      <h2 id="result-h">Result</h2>
+      <span id="submission-id" class="chip mono muted-chip"></span>
+    </div>
+
+    <div id="idle" class="empty">
+      <p>Submit a problem to begin.</p>
+      <p class="hint">
+        The pipeline compiles and judges first. Only a wrong answer is worth the
+        expense of writing a reference implementation.
+      </p>
+    </div>
+
+    <div id="live" hidden>
+      <ol class="stages" id="stages"></ol>
+
+      <div id="verdict-block" class="verdict-block" hidden>
+        <div class="verdict-row">
+          <span id="verdict" class="v"></span>
+          <span id="usage" class="chip mono"></span>
+        </div>
+        <p id="summary" class="summary"></p>
+      </div>
+
+      <div id="counterexample" class="counterexample" hidden>
+        <h3>Counterexample</h3>
+        <dl class="ce">
+          <dt>input</dt>
+          <dd><pre id="ce-input"></pre></dd>
+          <dt>expected</dt>
+          <dd><pre id="ce-expected"></pre></dd>
+          <dt>actual</dt>
+          <dd><pre id="ce-actual" class="bad"></pre></dd>
+          <dt>bug class</dt>
+          <dd><span id="ce-class" class="chip mono accent-chip"></span></dd>
+        </dl>
+        <div class="explain">
+          <h4>Why</h4>
+          <p id="ce-why"></p>
+          <h4>Fix</h4>
+          <p id="ce-fix"></p>
+        </div>
+        <button type="button" id="copy-input" class="ghost">copy failing input</button>
+      </div>
+
+      <details id="artifacts-wrap" hidden>
+        <summary>Generated programs</summary>
+        <p class="hint">
+          Read the brute force. If it looks wrong to you, ignore the verdict —
+          everything downstream depends on it being right.
+        </p>
+        <div id="artifacts"></div>
+      </details>
+
+      <details id="log-wrap" hidden>
+        <summary>Replay log</summary>
+        <div class="scroll"><table class="log"><tbody id="log"></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
