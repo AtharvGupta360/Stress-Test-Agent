@@ -18,6 +18,20 @@ from ..runner.docker_runner import ExecResult
 from ..states import Verdict
 from .context import Context, Mismatch
 
+# Ceiling on the analyzer's estimate, not a target. Calibration walks down from
+# here to whatever the generated brute force can actually sustain.
+MAX_SIZE_KNOB = 100_000
+
+# How long the brute force gets on one calibration case before we call it too slow.
+BRUTE_CALIBRATION_TIMEOUT = 12.0
+
+# Each failure halves the size knob, so this reaches 1 from any starting point.
+MAX_CALIBRATION_STEPS = 10
+
+# Internal sentinel: the brute force was too slow, which is a size problem to be
+# solved by calibration rather than a code problem to send back to the model.
+TOO_SLOW = "\x00too-slow"
+
 
 def tokens(text: str) -> list[str]:
     return text.split()
@@ -87,9 +101,13 @@ async def analyze(ctx: Context) -> ConstraintSpec:
         schema=ConstraintSpec,
         temperature=0.1,
     )
-    # A model that reports a huge brute cap will hang every round; one that
-    # reports a tiny cap only slows discovery. Clamp toward the safe side.
-    spec.size_knob_brute_max = max(1, min(spec.size_knob_brute_max, 60))
+    # Only an upper bound against a wild estimate -- the real limit is measured
+    # in _calibrate_size(). A fixed low cap is actively harmful: the size knob
+    # means different things in different problems (a count of elements, where
+    # the brute force is exponential and must stay tiny; or a magnitude, where
+    # it is linear and 10^5 is cheap), and capping a magnitude at a count-sized
+    # number puts real bugs permanently out of reach.
+    spec.size_knob_brute_max = max(1, min(spec.size_knob_brute_max, MAX_SIZE_KNOB))
     ctx.spec = spec
     await save_artifact(ctx.submission_id, "spec", spec.model_dump_json(indent=2))
     await ctx.note(
@@ -198,35 +216,13 @@ async def validate(ctx: Context) -> str:
 
     # -- Gate 2: the generator runs, and its output is legal -----------------
     assert ctx.spec is not None
-    for size in (1, max(1, ctx.spec.size_knob_brute_max // 2)):
-        gen = await ctx.sandbox.exec(["python3", "generator.py", "12345", str(size)], timeout=10)
-        if gen.code != 0 or not gen.stdout.strip():
-            await ctx.note("VALIDATE", "gate", "fail", which="generator", size=size)
-            return (
-                f"generator.py failed at SIZE={size} "
-                f"(exit {gen.code}):\n{gen.stderr[:1500]}"
-            )
-        val = await ctx.sandbox.exec(["python3", "validator.py"], stdin_data=gen.stdout, timeout=10)
-        if val.code != 0:
-            await ctx.note("VALIDATE", "gate", "fail", which="validator", size=size)
-            return (
-                f"generator.py produced input its own validator rejects at "
-                f"SIZE={size}: {val.stderr[:800]}\nInput was:\n{gen.stdout[:800]}"
-            )
-        # The brute force must survive its own generator's output.
-        bru = await ctx.sandbox.exec(["python3", "brute.py"], stdin_data=gen.stdout, timeout=15)
-        if bru.timed_out:
-            await ctx.note("VALIDATE", "gate", "fail", which="brute", why="timeout", size=size)
-            return (
-                f"brute.py timed out at SIZE={size}. Either lower the brute-force "
-                f"cost or the generator is emitting a case far larger than SIZE."
-            )
-        if bru.code != 0:
-            await ctx.note("VALIDATE", "gate", "fail", which="brute", why="crash", size=size)
-            return (
-                f"brute.py crashed on its own generator's output at SIZE={size}:\n"
-                f"{bru.stderr[:1500]}\nInput was:\n{gen.stdout[:800]}"
-            )
+    failure = await _probe(ctx, 1)
+    if failure:
+        return failure
+
+    failure = await _calibrate_size(ctx)
+    if failure:
+        return failure
 
     # -- Gate 1: the brute force reproduces the official samples -------------
     for i, sample in enumerate(ctx.samples):
@@ -252,6 +248,78 @@ async def validate(ctx: Context) -> str:
 
     await ctx.note("VALIDATE", "gate", "ok", samples_checked=len(ctx.samples))
     return ""
+
+
+async def _probe(ctx: Context, size: int) -> str:
+    """Generate one case at `size`, validate it, and run the brute force on it.
+
+    Returns "" if all three succeed, otherwise a repair description. A timeout
+    is reported as the sentinel TOO_SLOW so the caller can decide whether to
+    shrink the size knob or give up.
+    """
+    gen = await ctx.sandbox.exec(["python3", "generator.py", "12345", str(size)], timeout=15)
+    if gen.code != 0 or not gen.stdout.strip():
+        await ctx.note("VALIDATE", "gate", "fail", which="generator", size=size)
+        return f"generator.py failed at SIZE={size} (exit {gen.code}):\n{gen.stderr[:1500]}"
+
+    val = await ctx.sandbox.exec(["python3", "validator.py"], stdin_data=gen.stdout, timeout=15)
+    if val.code != 0:
+        await ctx.note("VALIDATE", "gate", "fail", which="validator", size=size)
+        return (
+            f"generator.py produced input its own validator rejects at "
+            f"SIZE={size}: {val.stderr[:800]}\nInput was:\n{gen.stdout[:800]}"
+        )
+
+    bru = await ctx.sandbox.exec(
+        ["python3", "brute.py"], stdin_data=gen.stdout, timeout=BRUTE_CALIBRATION_TIMEOUT
+    )
+    if bru.timed_out:
+        return TOO_SLOW
+    if bru.code != 0:
+        await ctx.note("VALIDATE", "gate", "fail", which="brute", why="crash", size=size)
+        return (
+            f"brute.py crashed on its own generator's output at SIZE={size}:\n"
+            f"{bru.stderr[:1500]}\nInput was:\n{gen.stdout[:800]}"
+        )
+    return ""
+
+
+async def _calibrate_size(ctx: Context) -> str:
+    """Measure the largest size knob the brute force can actually sustain.
+
+    The analyzer's estimate is a guess made from prose, and guessing low is not
+    the safe direction it appears to be: a size knob capped below where a bug
+    first appears makes that bug permanently invisible, and the run reports
+    "no disagreement found" with total confidence. So start at the estimate and
+    halve until it fits, recording where it landed.
+    """
+    assert ctx.spec is not None
+
+    for _ in range(MAX_CALIBRATION_STEPS):
+        size = ctx.spec.size_knob_brute_max
+        result = await _probe(ctx, size)
+
+        if result == TOO_SLOW:
+            if size <= 1:
+                await ctx.note("VALIDATE", "gate", "fail", which="brute", why="timeout", size=1)
+                return (
+                    "brute.py times out even at SIZE=1. It is far too expensive; "
+                    "write a simpler, more direct simulation of the statement."
+                )
+            ctx.spec.size_knob_brute_max = max(1, size // 2)
+            await ctx.note(
+                "VALIDATE", "gate", "skip",
+                why="brute_too_slow", was=size, now=ctx.spec.size_knob_brute_max,
+            )
+            continue
+
+        if result:
+            return result
+
+        await ctx.note("VALIDATE", "gate", "ok", which="calibration", size_knob=size)
+        return ""
+
+    return "could not find a workable size for brute.py"
 
 
 async def _run_checker(ctx: Context, inp: str, contestant: str, reference: str) -> bool:

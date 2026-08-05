@@ -112,6 +112,20 @@ python scripts/migrate.py
 docker compose up api worker
 ```
 
+### The web UI
+
+With the stack running, open **http://127.0.0.1:8000**. Paste a statement, your
+code and the samples, pick an external verdict if an online judge already
+rejected it, and hit Run. Progress streams live over SSE as each stage
+completes; the result panel shows the counterexample, the bug class, the
+generated brute force and the full replay log.
+
+"load example" fills the form with a wrong-greedy solution that passes both its
+samples, if you just want to watch it work.
+
+No build step and no framework — three static files served by FastAPI from
+`src/stressagent/static/`.
+
 ### Submitting your own problem
 
 Lay the problem out as a directory:

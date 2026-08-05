@@ -7,7 +7,6 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Response

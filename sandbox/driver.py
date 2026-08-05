@@ -174,6 +174,22 @@ def probe(
     return None
 
 
+def shrink_candidates(found_size: int) -> list[int]:
+    """Sizes to try, smallest first.
+
+    Scanning 1..found_size linearly is fine when the bug was found at size 8 and
+    hopeless when it was found at 50000. Sweep the small sizes exhaustively --
+    that is where an answer is worth having -- then climb geometrically, so the
+    number of probes grows with the logarithm of the size rather than the size.
+    """
+    sizes = [s for s in range(1, min(found_size, 31))]
+    step = max(31, 1)
+    while step < found_size:
+        sizes.append(step)
+        step = max(step + 1, int(step * 1.5))
+    return [s for s in sizes if s < found_size]
+
+
 def shrink(
     found: Mismatch, user_cmd: list[str], timeout: float, seeds_per_size: int, deadline: float
 ) -> tuple[Mismatch, int]:
@@ -186,7 +202,7 @@ def shrink(
     """
     best = found
     steps = 0
-    for size in range(1, found.size):
+    for size in shrink_candidates(found.size):
         if time.monotonic() > deadline:
             break
         for k in range(seeds_per_size):
@@ -203,6 +219,40 @@ def shrink(
 # ----------------------------------------------------------------------- main
 
 
+SMALL_SWEEP_FRACTION = 0.5
+
+
+def pick_size(i: int, size_min: int, size_max: int, rounds: int) -> int:
+    """Choose the size knob for round i.
+
+    Two phases, because bugs cluster in two very different places.
+
+    The first half sweeps the smallest sizes *densely and exhaustively* -- every
+    value from size_min upward, one per round, no repeats. Dense matters: some
+    failure sets are sparse and exact, like a carry bug that only fires at
+    n = 199, 399, 599. Sampling near those values is worthless; you have to land
+    on them. Sweeping consecutively is the only way to guarantee that, and it
+    costs nothing because small cases are the cheapest to run.
+
+    The second half samples log-uniformly across the whole legal range, so a bug
+    that only appears at magnitude -- an accumulator overflowing at 10^5 -- is
+    still reachable without spending 100000 rounds ramping up to it.
+    """
+    if size_max <= size_min:
+        return size_min
+
+    span = size_max - size_min + 1
+    sweep_rounds = max(1, int(rounds * SMALL_SWEEP_FRACTION))
+    if i < sweep_rounds:
+        return size_min + (i % min(span, sweep_rounds))
+
+    # Deterministic in i, so a run stays reproducible without touching random().
+    frac = ((i * 2654435761) % 10_000) / 10_000.0
+    lo = max(size_min, 1)
+    size = int(round(lo * ((size_max / lo) ** frac)))
+    return max(size_min, min(size, size_max))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--user-cmd", required=True, help="shell-free argv, space separated")
@@ -217,16 +267,13 @@ def main() -> int:
 
     user_cmd = args.user_cmd.split()
     deadline = time.monotonic() + args.time_budget
-    size_span = max(1, args.size_max - args.size_min + 1)
 
     for i in range(args.rounds):
         if time.monotonic() > deadline:
             emit(event="done", found=False, rounds=i, reason="time_budget")
             return 0
 
-        # Ramp size with round number: small inputs first, because small bugs are
-        # both more common and cheaper to shrink.
-        size = args.size_min + (i % size_span)
+        size = pick_size(i, args.size_min, args.size_max, args.rounds)
         seed = args.seed_base + i
 
         found = probe(seed, size, user_cmd, args.per_run_timeout)

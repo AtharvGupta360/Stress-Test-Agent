@@ -281,15 +281,37 @@ button { font-family: inherit; cursor: pointer; }
 /* ------------------------------------------------------ counterexample */
 
 .counterexample { border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 18px; }
+.ce-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
 .counterexample h3 {
   font-family: var(--mono);
   font-size: 11.5px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
-  margin: 0 0 12px;
+  margin: 0;
   font-weight: 650;
 }
+
+/* The counterexample is a fact; the explanation below it is a claim. Marking
+   the boundary is the honest thing to do -- it is the one place in the whole
+   pipeline where unverified model output reaches the user. */
+.chip.proof { color: var(--ok); border-color: var(--ok); background: var(--ok-bg); }
+.chip.unproven { color: var(--muted); border-style: dashed; }
+
+.explain {
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.explain-head { margin-bottom: 8px; }
+.explain > .hint { margin: 0 0 14px; max-width: 62ch; }
 .ce { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px 12px; margin: 0 0 14px; align-items: start; }
 .ce dt { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 3px; }
 .ce dd { margin: 0; min-width: 0; }

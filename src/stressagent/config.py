@@ -43,7 +43,11 @@ class Settings(BaseSettings):
 
     # Bumped whenever prompts, gates, or the stress loop change semantics.
     # Part of the idempotency key so a fix invalidates stale cached results.
-    pipeline_version: str = "1"
+    #   2 -- size knob is now measured by calibration rather than capped at 60,
+    #        and the stress loop sweeps small sizes densely. Runs before this
+    #        could not reach bugs that first appear above n=60 and reported
+    #        "no disagreement found" with full confidence.
+    pipeline_version: str = "2"
 
 
 @lru_cache

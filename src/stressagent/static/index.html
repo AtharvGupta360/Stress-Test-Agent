@@ -110,7 +110,10 @@
       </div>
 
       <div id="counterexample" class="counterexample" hidden>
-        <h3>Counterexample</h3>
+        <div class="ce-head">
+          <h3>Counterexample</h3>
+          <span class="chip proof">proven by execution</span>
+        </div>
         <dl class="ce">
           <dt>input</dt>
           <dd><pre id="ce-input"></pre></dd>
@@ -122,6 +125,14 @@
           <dd><span id="ce-class" class="chip mono accent-chip"></span></dd>
         </dl>
         <div class="explain">
+          <div class="explain-head">
+            <span class="chip unproven">model narrative — not verified</span>
+          </div>
+          <p class="hint">
+            The four lines above were produced by running real programs. Everything
+            below is the model's account of them, and nothing checks it. The failing
+            input is the deliverable; this is a convenience.
+          </p>
           <h4>Why</h4>
           <p id="ce-why"></p>
           <h4>Fix</h4>
